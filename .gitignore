@@ -1,0 +1,47 @@
+# Unreal Engine
+Binaries/
+Intermediate/
+DerivedDataCache/
+Saved/
+Build/
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Rider
+.idea/
+
+# Build artifacts
+*.dll
+*.exe
+*.exp
+*.lib
+*.pdb
+*.target
+*.modules
+
+# Compiled source
+*.obj
+*.o
+*.so
+*.dylib
+
+# Exception: Keep plugin descriptors and project files
+!*.uplugin
+!*.uproject
+!*.sln
+
+# vcpkg
+vcpkg_installed/
+.vcpkg-root
+
+# Logs
+*.log
+
+# Config overrides (keep defaults)
+Saved/*
+!Config/Default*.ini

@@ -1,0 +1,31 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "Gaia Procedural Tectonic Planets",
+  "Description": "Core systems for Procedural Tectonic Planets (PTP) in Unreal.",
+  "Category": "Procedural",
+  "CreatedBy": "Gaia",
+  "EnabledByDefault": true,
+  "Modules": [
+    {
+      "Name": "GaiaPTP",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    },
+    {
+      "Name": "GaiaPTPEditor",
+      "Type": "Editor",
+      "LoadingPhase": "Default"
+    },
+    {
+      "Name": "GaiaPTPCGAL",
+      "Type": "Runtime",
+      "LoadingPhase": "Default",
+      "WhitelistPlatforms": [ "Win64" ]
+    }
+  ],
+  "Plugins": [
+    { "Name": "RealtimeMeshComponent", "Enabled": true }
+  ]
+}
