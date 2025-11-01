@@ -3,6 +3,7 @@
 #include "FibonacciSphere.h"
 #include "TectonicSeeding.h"
 #include "TectonicData.h"
+#include "CrustInitialization.h"
 #include "PTPProfiling.h"
 
 UPTPPlanetComponent::UPTPPlanetComponent()
@@ -122,9 +123,41 @@ void UPTPPlanetComponent::RebuildPlanet()
         NewPlates[p].CentroidDir = Seeds.IsValidIndex(p) ? Seeds[p] : FVector::ZeroVector;
     }
 
+    // Task 1.11-1.12: Initialize crust data
+    TArray<FCrustData> NewCrustData;
+    {
+        CSV_SCOPED_TIMING_STAT(GAIA_PTP, CrustInit);
+
+        const UGaiaPTPSettings* Settings = GetDefault<UGaiaPTPSettings>();
+        FCrustInitialization::InitializeCrustData(
+            SamplePoints,
+            PlateToPoints,
+            ContinentalRatio,
+            Settings->AbyssalPlainElevationKm,
+            Settings->HighestOceanicRidgeElevationKm,
+            Settings->InitialSeed,
+            NewCrustData
+        );
+    }
+
+    // Task 1.13: Initialize plate dynamics
+    {
+        CSV_SCOPED_TIMING_STAT(GAIA_PTP, PlateDynamics);
+
+        const UGaiaPTPSettings* Settings = GetDefault<UGaiaPTPSettings>();
+        FCrustInitialization::InitializePlateDynamics(
+            NumPlates,
+            PlanetRadiusKm,
+            MaxPlateSpeedMmPerYear,
+            Settings->InitialSeed + 100, // Offset seed
+            NewPlates
+        );
+    }
+
     // Store on component (transient preview only for Phase 1)
     Plates = MoveTemp(NewPlates);
     PointPlateIds = MoveTemp(PointToPlate);
+    CrustData = MoveTemp(NewCrustData);
     NumPlatesGenerated = Plates.Num();
 }
 

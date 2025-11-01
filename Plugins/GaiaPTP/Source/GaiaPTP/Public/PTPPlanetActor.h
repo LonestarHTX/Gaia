@@ -31,7 +31,11 @@ protected:
 
     // Preview mode selector for editor visualization
     UPROPERTY(EditAnywhere, Category="PTP|Preview")
-    EPTPPreviewMode PreviewMode = EPTPPreviewMode::Points;
+    EPTPPreviewMode PreviewMode = EPTPPreviewMode::Surface;
+
+    // Material to use for planet rendering (should use vertex colors)
+    UPROPERTY(EditAnywhere, Category="PTP|Preview")
+    class UMaterialInterface* PlanetMaterial;
 
     // Build/refresh CGAL adjacency (triangles & neighbors). Exposed as an editor button.
     UFUNCTION(CallInEditor, Category="PTP|Preview")
@@ -42,4 +46,8 @@ protected:
     void TogglePreviewMode();
 
     virtual void OnConstruction(const FTransform& Transform) override;
+    virtual void BeginPlay() override;
+
+private:
+    void RebuildMesh();
 };

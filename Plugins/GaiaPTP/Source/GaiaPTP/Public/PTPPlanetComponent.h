@@ -85,17 +85,32 @@ public:
     UPROPERTY(VisibleAnywhere, Transient, Category="PTP|Debug")
     int32 NumPlatesGenerated;
 
-    // Not saved; preview cloud only
+    // Runtime planet data - not exposed in Details panel but duplicated to PIE for instant startup
+    // Note: Removing Transient allows PIE duplication while keeping them hidden (no EditAnywhere/VisibleAnywhere)
+    UPROPERTY()
     TArray<FVector> SamplePoints;
 
-    // Mapping from sample index -> plate id (preview) - not exposed to avoid Details panel lag
+    // Mapping from sample index -> plate id
+    UPROPERTY()
     TArray<int32> PointPlateIds;
 
-    // Plate data (preview)
+    // Crust data per sample point
+    UPROPERTY()
+    TArray<struct FCrustData> CrustData;
+
+    // Boundary point flags (true if point is on plate boundary)
+    UPROPERTY()
+    TArray<bool> IsBoundaryPoint;
+
+    // Plate data
+    UPROPERTY()
     TArray<struct FTectonicPlate> Plates;
 
-    // Adjacency (preview) - not exposed to avoid Details panel lag
+    // Adjacency — nested TArray cannot be a UPROPERTY; keep internal (will need manual duplication)
     TArray<TArray<int32>> Neighbors;
+
+    // Triangulation mesh
+    UPROPERTY()
     TArray<FIntVector> Triangles;
 
 public:

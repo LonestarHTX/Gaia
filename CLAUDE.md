@@ -6,13 +6,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Gaia** is an Unreal Engine 5.5 C++ project implementing a procedural tectonic planet generation system based on the research paper "Procedural Tectonic Planets" by Cortial et al. (2019). The project simulates geological processes (plate tectonics, erosion, mountain formation) to create geologically-plausible planets at multiple scales.
 
-**Current Status:** Phase 1 (Foundation) partially complete - GaiaPTP plugin scaffolded with runtime/editor/CGAL modules, DeveloperSettings configured, Fibonacci sphere sampling implemented with tests, core data structures (FCrustData, FTectonicPlate, FTerrane) defined, initial plate seeding working. Automation tests passing. Next: complete adjacency/Delaunay triangulation via CGAL integration.
+**Current Status:** ✅ **Phase 1 (Foundation) COMPLETE** - Full tectonic planet foundation implemented with Fibonacci sphere sampling, CGAL Delaunay triangulation, crust initialization, plate dynamics, boundary detection, parallelized initialization, Spore-style orbit camera, and comprehensive test suite. Ready for Phase 2 (plate movement and tectonic interactions).
 
 ## Quick Reference
 
 **Most Common Commands:**
 ```powershell
-# Build and run all tests (recommended)
+# Quick build (no tests)
+PowerShell ./Scripts/Build-PTP.ps1
+
+# Build and run all tests (full validation)
 PowerShell ./Scripts/BuildAndTest-PTP.ps1
 
 # Setup CGAL (one-time, before first build)
@@ -53,22 +56,30 @@ $env:VCPKG_ROOT = "$env:USERPROFILE\vcpkg"
 "C:\Program Files\Epic Games\UE_5.5\Engine\Build\BatchFiles\Clean.bat" GaiaEditor Win64 Development "C:\Users\Michael\Documents\Unreal Projects\Gaia\Gaia.uproject"
 ```
 
-### Automated Build & Test Script
+### Automated Build Scripts
 ```powershell
-# Run all automation tests (recommended workflow)
+# Quick build (no tests) - use for parameter tweaks
+PowerShell ./Scripts/Build-PTP.ps1
+
+# Build and run all tests - use for feature changes
 PowerShell ./Scripts/BuildAndTest-PTP.ps1
 
-# This script:
-# - Builds GaiaEditor Win64 Development
-# - Runs all GaiaPTP automation tests:
-#   - GaiaPTP.Settings.Defaults
-#   - GaiaPTP.Component.DefaultsCopied
-#   - GaiaPTP.Fibonacci.CountAndRadius
-#   - GaiaPTP.Fibonacci.UniformityBins
-#   - GaiaPTP.Data.Defaults
-#   - GaiaPTP.Data.PlateVelocity
-#   - GaiaPTP.Seeding.Basic
-#   - GaiaPTP.Adjacency.Smoke
+# BuildAndTest-PTP.ps1 runs:
+# - GaiaPTP.Settings.Defaults
+# - GaiaPTP.Component.DefaultsCopied
+# - GaiaPTP.Fibonacci.CountAndRadius
+# - GaiaPTP.Fibonacci.UniformityBins
+# - GaiaPTP.Data.Defaults
+# - GaiaPTP.Data.PlateVelocity
+# - GaiaPTP.Seeding.Basic
+# - GaiaPTP.Adjacency.Smoke
+# - GaiaPTP.Adjacency.Integrity
+# - GaiaPTP.Determinism.Sampling
+# - GaiaPTP.Determinism.Seeding
+# - GaiaPTP.CrustInit.DataInit
+# - GaiaPTP.CrustInit.PlateDynamics
+# - GaiaPTP.CrustInit.BoundaryDetection
+# - GaiaPTP.CrustInit.Integration
 ```
 
 ### Build from Visual Studio
@@ -93,6 +104,45 @@ $env:VCPKG_ROOT = "$env:USERPROFILE\vcpkg"
 
 # The GaiaPTPCGAL module will detect CGAL headers and set WITH_CGAL=1
 # If CGAL is not found, the module compiles but triangulation features are disabled
+```
+
+## Console Commands
+
+Runtime console commands for development and debugging (accessible via ` key in-game):
+
+### Profiling Commands
+```
+ptp.profile.start          - Begin CSV profiling capture for PTP category
+ptp.profile.stop           - End CSV profiling capture
+ptp.bench.rebuild          - Rebuild planet with current project settings (benchmark Phase 1)
+ptp.bench.rebuild_np       - Rebuild with custom point/plate count (see cvars below)
+```
+
+### Configuration CVars
+```
+ptp.parallel 0/1           - Disable/enable ParallelFor in initialization (default: 1)
+ptp.bench.numPoints N      - Set point count for ptp.bench.rebuild_np (default: 100000)
+ptp.bench.numPlates N      - Set plate count for ptp.bench.rebuild_np (default: 40)
+```
+
+### Camera Controls (PTPOrbitCamera - Spore-style)
+**Mouse:**
+- Left/Right Mouse Drag - Orbit camera around planet
+- Mouse Wheel - Zoom in/out
+- Escape - Toggle cursor visibility
+
+**Keyboard:**
+- W/S or Up/Down - Tilt camera up/down
+- A/D or Left/Right - Rotate camera left/right
+- Q/E - Zoom out/in
+
+### Example Profiling Session
+```
+# In-game console
+ptp.profile.start
+ptp.bench.rebuild
+ptp.profile.stop
+# CSV file written to: Saved/Profiling/
 ```
 
 ## Architecture
@@ -298,26 +348,52 @@ Project path uses Windows path: `/mnt/c/Users/Michael/Documents/Unreal Projects/
 
 ## Critical Notes
 
-### Completed (Phase 1 Foundation)
-- ✅ GaiaPTP plugin with three-module architecture
-- ✅ UGaiaPTPSettings with Appendix A constants in Config/DefaultGame.ini
-- ✅ Fibonacci sphere sampling (FFibonacciSphere) with uniformity tests
-- ✅ Core data structures: FCrustData, FTectonicPlate, FTerrane
-- ✅ APTPPlanetActor and UPTPPlanetComponent with per-actor settings
-- ✅ Initial plate seeding (Voronoi partitioning)
-- ✅ Automation test suite (8 tests passing)
-- ✅ Build/test script (BuildAndTest-PTP.ps1)
-- ✅ CGAL setup script (Setup-CGAL.ps1)
+### ✅ Completed (Phase 1 Foundation - COMPLETE)
 
-### In Progress / Not Yet Implemented
-- ⏳ Delaunay triangulation (requires CGAL integration completion)
-- ⏳ Adjacency queries and spatial acceleration
-- ❌ Plate movement kernel (geodetic rotation)
+**Core Systems:**
+- ✅ GaiaPTP plugin with three-module architecture (Runtime, Editor, CGAL)
+- ✅ UGaiaPTPSettings with Appendix A constants in Config/DefaultGame.ini
+- ✅ Fibonacci sphere sampling (FFibonacciSphere) with uniformity validation
+- ✅ CGAL Delaunay triangulation on sphere (spherical adjacency + triangles)
+- ✅ Adjacency queries via CGAL provider interface
+
+**Data Structures:**
+- ✅ FCrustData - elevation, thickness, type, age, ridge/fold directions
+- ✅ FTectonicPlate - rotation axis, angular velocity, terrane system
+- ✅ FTerrane - continental crust regions
+- ✅ APTPPlanetActor and UPTPPlanetComponent with per-actor settings override
+
+**Initialization:**
+- ✅ Plate seeding (Fibonacci-based Voronoi partitioning)
+- ✅ Crust data initialization (continental/oceanic classification)
+- ✅ Plate dynamics initialization (random rotation axes/velocities)
+- ✅ Boundary detection (plate edge identification)
+- ✅ Parallelization (ParallelFor in crust init + boundary detection)
+- ✅ Performance logging (timing output for parallel operations)
+
+**Visualization:**
+- ✅ RealtimeMeshComponent integration (Points + Surface preview modes)
+- ✅ Vertex-colored plate visualization (MurmurHash3 plate colors)
+- ✅ Spore-style orbital camera (APTPOrbitCamera with mouse + keyboard controls)
+- ✅ PTPGameMode (auto-spawns camera + planet if missing)
+- ✅ Material system (M_DevPlanet vertex color material)
+
+**Testing & Tooling:**
+- ✅ Comprehensive automation test suite (15 tests passing):
+  - Settings, Component, Fibonacci, Data, Seeding, Adjacency
+  - Determinism tests (sampling + seeding reproducibility)
+  - Crust init tests (data init, dynamics, boundaries, integration)
+- ✅ Build scripts (Build-PTP.ps1, BuildAndTest-PTP.ps1)
+- ✅ CGAL setup script (Setup-CGAL.ps1)
+- ✅ Console commands (profiling, benchmarking, CVars)
+
+### Phase 2 - Not Yet Implemented
+- ❌ Plate movement kernel (geodetic rotation per time step)
 - ❌ Tectonic interactions (subduction, collision, rifting, spreading)
-- ❌ Surface processes (erosion, dampening)
+- ❌ Surface processes (erosion, oceanic dampening)
 - ❌ Amplification (Gabor noise, exemplar synthesis)
-- ❌ Mesh visualization via RealtimeMeshComponent
-- ❌ Content (no maps, blueprints, materials yet)
+- ❌ LOD system for multi-scale rendering
+- ❌ Save/load system for planet state
 
 ### Known Dependencies
 - CGAL library - vcpkg-based installation via Setup-CGAL.ps1 (partial)

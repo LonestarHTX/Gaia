@@ -5,6 +5,7 @@
 #include "RealtimeMeshLibrary.h"
 #include "PTPProfiling.h"
 #include "IPTPAdjacencyProvider.h"
+#include "CrustInitialization.h"
 
 using namespace RealtimeMesh;
 #include "Core/RealtimeMeshBuilder.h"
@@ -15,15 +16,104 @@ APTPPlanetActor::APTPPlanetActor()
     RealtimeMesh = CreateDefaultSubobject<URealtimeMeshComponent>(TEXT("RealtimeMesh"));
     SetRootComponent(RealtimeMesh);
 
+    // Disable culling - planet is huge and should always be visible
+    RealtimeMesh->SetCullDistance(0.0f); // 0 = never cull
+    RealtimeMesh->bUseAsOccluder = false;
+    RealtimeMesh->CastShadow = false; // Disable shadows for performance
+
     Planet = CreateDefaultSubobject<UPTPPlanetComponent>(TEXT("Planet"));
+
+    // Load default planet material (vertex colored)
+    static ConstructorHelpers::FObjectFinder<UMaterialInterface> MaterialFinder(
+        TEXT("/Game/Materials/Dev/M_DevPlanet")
+    );
+    if (MaterialFinder.Succeeded())
+    {
+        PlanetMaterial = MaterialFinder.Object;
+    }
+}
+
+void APTPPlanetActor::BeginPlay()
+{
+    Super::BeginPlay();
+
+    UE_LOG(LogTemp, Log, TEXT("PTPPlanetActor: BeginPlay started at location %s"), *GetActorLocation().ToString());
+
+    if (!Planet)
+    {
+        UE_LOG(LogTemp, Error, TEXT("PTPPlanetActor: No Planet component!"));
+        return;
+    }
+
+    // Smart rebuild: only regenerate if data is missing or stale
+    const bool bNeedsRebuild = (Planet->SamplePoints.Num() != Planet->NumSamplePoints);
+    const bool bNeedsAdjacency = (Planet->Triangles.Num() == 0);
+
+    if (bNeedsRebuild)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("PTP: Rebuilding planet (sample count changed: %d -> %d)"),
+            Planet->SamplePoints.Num(), Planet->NumSamplePoints);
+        Planet->RebuildPlanet();
+        BuildAdjacency(); // Need new adjacency after rebuild
+    }
+    else if (bNeedsAdjacency)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("PTP: Building missing adjacency (no triangulation data)"));
+        BuildAdjacency();
+    }
+    else
+    {
+        UE_LOG(LogTemp, Log, TEXT("PTP: Using cached planet data (%d points, %d triangles) - no rebuild needed"),
+            Planet->SamplePoints.Num(), Planet->Triangles.Num());
+    }
+
+    // Always rebuild mesh (lightweight operation)
+    RebuildMesh();
+
+    UE_LOG(LogTemp, Log, TEXT("PTPPlanetActor: BeginPlay complete - mesh should be visible"));
 }
 
 void APTPPlanetActor::OnConstruction(const FTransform& Transform)
 {
     Super::OnConstruction(Transform);
-    if (Planet)
+
+    if (!Planet)
     {
+        return;
+    }
+
+    // Smart rebuild: only regenerate if data is missing or stale
+    const bool bNeedsRebuild = (Planet->SamplePoints.Num() != Planet->NumSamplePoints);
+    const bool bNeedsAdjacency = (Planet->Triangles.Num() == 0);
+
+    if (bNeedsRebuild)
+    {
+        UE_LOG(LogTemp, Log, TEXT("PTP: OnConstruction rebuilding planet (sample count changed: %d -> %d)"),
+            Planet->SamplePoints.Num(), Planet->NumSamplePoints);
         Planet->RebuildPlanet();
+        BuildAdjacency(); // Need new adjacency after rebuild
+    }
+    else if (bNeedsAdjacency)
+    {
+        UE_LOG(LogTemp, Log, TEXT("PTP: OnConstruction building missing adjacency"));
+        BuildAdjacency();
+    }
+    else
+    {
+        UE_LOG(LogTemp, Log, TEXT("PTP: OnConstruction using cached planet data (%d points, %d triangles)"),
+            Planet->SamplePoints.Num(), Planet->Triangles.Num());
+    }
+
+    // Always rebuild mesh (lightweight operation)
+    RebuildMesh();
+}
+
+void APTPPlanetActor::RebuildMesh()
+{
+    if (!Planet)
+    {
+        return;
+    }
 
         if (URealtimeMeshSimple* RMSimple = RealtimeMesh->InitializeRealtimeMesh<URealtimeMeshSimple>())
         {
@@ -50,10 +140,17 @@ void APTPPlanetActor::OnConstruction(const FTransform& Transform)
 
             auto PlateColor = [](int32 PlateId) -> FColor
             {
-                uint32 h = ::GetTypeHash(PlateId);
+                // Better hash mixing for small integers (MurmurHash3 finalizer)
+                uint32 h = PlateId;
+                h = ((h >> 16) ^ h) * 0x45d9f3b;
+                h = ((h >> 16) ^ h) * 0x45d9f3b;
+                h = (h >> 16) ^ h;
+
                 uint8 r = (uint8)((h      ) & 0xFF);
                 uint8 g = (uint8)((h >> 8 ) & 0xFF);
                 uint8 b = (uint8)((h >> 16) & 0xFF);
+
+                // Map to pastel range: 64-191 (avoids very dark and very bright)
                 return FColor(r/2 + 64, g/2 + 64, b/2 + 64, 255);
             };
 
@@ -101,6 +198,12 @@ void APTPPlanetActor::OnConstruction(const FTransform& Transform)
                 }
 
                 RMSimple->CreateSectionGroup(PointsGroupKey, StreamSet);
+
+                // Apply material
+                if (PlanetMaterial)
+                {
+                    RealtimeMesh->SetMaterial(0, PlanetMaterial);
+                }
             }
             else // Surface
             {
@@ -145,12 +248,17 @@ void APTPPlanetActor::OnConstruction(const FTransform& Transform)
 
                     RMSimple->CreateSectionGroup(SurfaceGroupKey, StreamSet);
 
+                    // Apply material
+                    if (PlanetMaterial)
+                    {
+                        RealtimeMesh->SetMaterial(0, PlanetMaterial);
+                    }
+
                     UE_LOG(LogTemp, Log, TEXT("PTP: Surface rendered - %d vertices, %d triangles"),
                         Pts.Num(), Planet->Triangles.Num());
                 }
             }
         }
-    }
 }
 
 void APTPPlanetActor::BuildAdjacency()
@@ -197,6 +305,29 @@ void APTPPlanetActor::BuildAdjacency()
     Planet->Neighbors = MoveTemp(Adj.Neighbors);
     Planet->Triangles = MoveTemp(Adj.Triangles);
     Planet->NumTriangles = Planet->Triangles.Num();
+
+    // Task 1.14: Detect plate boundaries
+    if (Planet->PointPlateIds.Num() > 0)
+    {
+        FCrustInitialization::DetectPlateBoundaries(
+            Planet->PointPlateIds,
+            Planet->Neighbors,
+            Planet->IsBoundaryPoint
+        );
+
+        // Count boundary points for logging
+        int32 BoundaryCount = 0;
+        for (bool bIsBoundary : Planet->IsBoundaryPoint)
+        {
+            if (bIsBoundary) BoundaryCount++;
+        }
+
+        UE_LOG(LogTemp, Log, TEXT("PTP: Detected %d boundary points (%.1f%%)"),
+            BoundaryCount, 100.0f * BoundaryCount / FMath::Max(1, NumPoints));
+    }
+
+    // Refresh mesh to show new triangulation
+    RebuildMesh();
 }
 
 void APTPPlanetActor::TogglePreviewMode()

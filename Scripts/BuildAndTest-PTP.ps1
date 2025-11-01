@@ -83,6 +83,10 @@ if (-not $Filters -or $Filters.Count -eq 0) {
     "GaiaPTP.Adjacency.Integrity"
     ,"GaiaPTP.Determinism.Sampling"
     ,"GaiaPTP.Determinism.Seeding"
+    ,"GaiaPTP.CrustInit.DataInit"
+    ,"GaiaPTP.CrustInit.PlateDynamics"
+    ,"GaiaPTP.CrustInit.BoundaryDetection"
+    ,"GaiaPTP.CrustInit.Integration"
   )
 }
 
