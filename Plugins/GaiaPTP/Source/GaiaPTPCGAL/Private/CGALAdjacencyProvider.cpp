@@ -8,9 +8,64 @@
 CSV_DEFINE_CATEGORY(GAIA_PTP_CGAL, true);
 #include "Misc/Paths.h"
 #include "HAL/PlatformProcess.h"
+#include "Interfaces/IPluginManager.h"
 
 class FCGALAdjacencyProvider final : public IPTPAdjacencyProvider
 {
+private:
+    bool bDllsLoaded = false;
+
+    void EnsureDllsLoaded()
+    {
+        if (bDllsLoaded) return;
+
+        auto TryLoad = [](const FString& DllPath)
+        {
+            if (DllPath.IsEmpty()) return (void*)nullptr;
+            return FPlatformProcess::GetDllHandle(*DllPath);
+        };
+
+        // Try plain names first (PATH/module dir)
+        void* H1 = FPlatformProcess::GetDllHandle(TEXT("gmp-10.dll"));
+        void* H2 = FPlatformProcess::GetDllHandle(TEXT("gmpxx-4.dll"));
+        void* H3 = FPlatformProcess::GetDllHandle(TEXT("mpfr-6.dll"));
+
+        if (!H1 || !H2 || !H3)
+        {
+            // Try plugin's Binaries/Win64 directory (staged by scripts/build)
+            FString PluginBin;
+            if (IPluginManager::Get().FindPlugin(TEXT("GaiaPTP")).IsValid())
+            {
+                PluginBin = FPaths::Combine(IPluginManager::Get().FindPlugin(TEXT("GaiaPTP"))->GetBaseDir(), TEXT("Binaries/Win64"));
+            }
+            else
+            {
+                PluginBin = FPaths::Combine(FPaths::ProjectDir(), TEXT("Plugins/GaiaPTP/Binaries/Win64"));
+            }
+            if (!PluginBin.IsEmpty())
+            {
+                if (!H1) H1 = TryLoad(FPaths::Combine(PluginBin, TEXT("gmp-10.dll")));
+                if (!H2) H2 = TryLoad(FPaths::Combine(PluginBin, TEXT("gmpxx-4.dll")));
+                if (!H3) H3 = TryLoad(FPaths::Combine(PluginBin, TEXT("mpfr-6.dll")));
+            }
+        }
+
+        if (!H1 || !H2 || !H3)
+        {
+            // Try vcpkg bin from VCPKG_ROOT
+            const FString Root = FPlatformMisc::GetEnvironmentVariable(TEXT("VCPKG_ROOT"));
+            if (!Root.IsEmpty())
+            {
+                const FString Bin = FPaths::Combine(Root, TEXT("installed/x64-windows/bin"));
+                if (!H1) H1 = TryLoad(FPaths::Combine(Bin, TEXT("gmp-10.dll")));
+                if (!H2) H2 = TryLoad(FPaths::Combine(Bin, TEXT("gmpxx-4.dll")));
+                if (!H3) H3 = TryLoad(FPaths::Combine(Bin, TEXT("mpfr-6.dll")));
+            }
+        }
+
+        bDllsLoaded = true;
+    }
+
 public:
     virtual bool Build(const TArray<FVector>& InPoints, FPTPAdjacency& OutAdj, FString& OutError) override
     {
@@ -20,6 +75,9 @@ public:
             return false;
         }
 
+        // Ensure dependent DLLs are loaded once (gmp/mpfr via vcpkg)
+        EnsureDllsLoaded();
+
         // Prepare input buffer
         TArray<double> XYZ; XYZ.SetNumUninitialized(InPoints.Num()*3);
         for (int32 i=0;i<InPoints.Num();++i)
@@ -27,32 +85,6 @@ public:
             XYZ[3*i+0] = InPoints[i].X;
             XYZ[3*i+1] = InPoints[i].Y;
             XYZ[3*i+2] = InPoints[i].Z;
-        }
-
-        // Ensure dependent DLLs are loaded (gmp/mpfr via vcpkg)
-        {
-            auto TryLoad = [](const FString& DllPath)
-            {
-                if (DllPath.IsEmpty()) return (void*)nullptr;
-                return FPlatformProcess::GetDllHandle(*DllPath);
-            };
-            // Try plain names first (PATH/module dir)
-            void* H1 = FPlatformProcess::GetDllHandle(TEXT("gmp-10.dll"));
-            void* H2 = FPlatformProcess::GetDllHandle(TEXT("gmpxx-4.dll"));
-            void* H3 = FPlatformProcess::GetDllHandle(TEXT("mpfr-6.dll"));
-            if (!H1 || !H2 || !H3)
-            {
-                TCHAR Buffer[1024];
-                FPlatformMisc::GetEnvironmentVariable(TEXT("VCPKG_ROOT"), Buffer, 1024);
-                FString Root(Buffer);
-                if (!Root.IsEmpty())
-                {
-                    const FString Bin = FPaths::Combine(Root, TEXT("installed/x64-windows/bin"));
-                    if (!H1) H1 = TryLoad(FPaths::Combine(Bin, TEXT("gmp-10.dll")));
-                    if (!H2) H2 = TryLoad(FPaths::Combine(Bin, TEXT("gmpxx-4.dll")));
-                    if (!H3) H3 = TryLoad(FPaths::Combine(Bin, TEXT("mpfr-6.dll")));
-                }
-            }
         }
 
         // Call external library

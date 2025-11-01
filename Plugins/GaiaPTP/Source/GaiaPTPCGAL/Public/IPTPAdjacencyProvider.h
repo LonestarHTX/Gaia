@@ -2,13 +2,13 @@
 
 #include "CoreMinimal.h"
 
-struct FPTPAdjacency
+struct GAIAPTPCGAL_API FPTPAdjacency
 {
     TArray<TArray<int32>> Neighbors; // per-vertex neighbor indices
     TArray<FIntVector> Triangles;    // index triplets
 };
 
-class IPTPAdjacencyProvider
+class GAIAPTPCGAL_API IPTPAdjacencyProvider
 {
 public:
     virtual ~IPTPAdjacencyProvider() = default;
@@ -16,5 +16,4 @@ public:
     virtual bool Build(const TArray<FVector>& Points, FPTPAdjacency& OutAdj, FString& OutError) = 0;
 };
 
-TSharedPtr<IPTPAdjacencyProvider> CreateCGALAdjacencyProvider();
-
+GAIAPTPCGAL_API TSharedPtr<IPTPAdjacencyProvider> CreateCGALAdjacencyProvider();

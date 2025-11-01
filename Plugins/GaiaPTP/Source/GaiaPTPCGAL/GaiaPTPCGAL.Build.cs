@@ -12,8 +12,13 @@ public class GaiaPTPCGAL : ModuleRules
         {
             "Core",
             "CoreUObject",
-            "Engine",
-            "GaiaPTP"
+            "Engine"
+        });
+
+        PrivateDependencyModuleNames.AddRange(new string[]
+        {
+            // For IPluginManager to resolve plugin base dir at runtime
+            "Projects"
         });
 
         // Detect vcpkg install for CGAL headers

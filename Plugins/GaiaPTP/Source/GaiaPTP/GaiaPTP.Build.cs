@@ -20,7 +20,9 @@ public class GaiaPTP : ModuleRules
 
         PrivateDependencyModuleNames.AddRange(new string[]
         {
-            "Projects"
+            "Projects",
+            // Access public headers from CGAL provider module (IPTPAdjacencyProvider)
+            "GaiaPTPCGAL"
         });
 
         PublicIncludePaths.AddRange(new string[]

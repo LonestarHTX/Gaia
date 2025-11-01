@@ -23,9 +23,19 @@ public:
     virtual FName GetCategoryName() const override { return TEXT("Gaia"); }
 
     // --- Planet & Sampling ---
-    /** Planet radius (R) in km */
+    /** Planet radius (R) in km - used for simulation physics */
     UPROPERTY(EditAnywhere, Config, Category="Planet")
     float PlanetRadiusKm;
+
+    /**
+     * Visualization scale: km-to-UU conversion factor.
+     * - 1.0 = 1 km → 1 cm (tiny planet, 6.37m radius for Earth)
+     * - 100.0 = 1 km → 1 m (small planet, 6.37km radius for Earth) [Default]
+     * - 100000.0 = 1:1 real scale (1 km → 100000 cm, Earth = 6370 km radius)
+     * Note: UE5 uses 1 UU = 1 cm
+     */
+    UPROPERTY(EditAnywhere, Config, Category="Planet|Visualization", meta=(ClampMin="0.01"))
+    float VisualizationScale;
 
     /** Simulation time step (δt) in million years */
     UPROPERTY(EditAnywhere, Config, Category="Simulation")

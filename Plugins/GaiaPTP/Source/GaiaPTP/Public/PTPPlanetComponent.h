@@ -21,6 +21,9 @@ public:
     UPROPERTY(EditAnywhere, Category="PTP|Planet")
     float PlanetRadiusKm;
 
+    UPROPERTY(EditAnywhere, Category="PTP|Planet|Visualization", meta=(ClampMin="0.01"))
+    float VisualizationScale;
+
     UPROPERTY(EditAnywhere, Category="PTP|Sampling")
     int32 NumSamplePoints;
 
@@ -76,22 +79,23 @@ public:
     UPROPERTY(VisibleAnywhere, Transient, Category="PTP|Debug")
     int32 NumGeneratedPoints;
 
+    UPROPERTY(VisibleAnywhere, Transient, Category="PTP|Debug")
+    int32 NumTriangles;
+
+    UPROPERTY(VisibleAnywhere, Transient, Category="PTP|Debug")
+    int32 NumPlatesGenerated;
+
     // Not saved; preview cloud only
     TArray<FVector> SamplePoints;
 
-    // Mapping from sample index -> plate id (preview)
-    UPROPERTY(VisibleAnywhere, Transient, Category="PTP|Debug")
+    // Mapping from sample index -> plate id (preview) - not exposed to avoid Details panel lag
     TArray<int32> PointPlateIds;
 
     // Plate data (preview)
-    UPROPERTY(VisibleAnywhere, Transient, Category="PTP|Debug")
     TArray<struct FTectonicPlate> Plates;
 
-    // Adjacency (preview)
-    // Not exposed due to nested array UPROPERTY limitation
+    // Adjacency (preview) - not exposed to avoid Details panel lag
     TArray<TArray<int32>> Neighbors;
-
-    UPROPERTY(VisibleAnywhere, Transient, Category="PTP|Debug")
     TArray<FIntVector> Triangles;
 
 public:
@@ -105,4 +109,10 @@ public:
 
 protected:
     virtual void OnRegister() override;
+
+private:
+    // Cache for RebuildPlanet() optimization - parameter hash
+    uint32 CachedSettingsHash = 0;
+
+    uint32 ComputeSettingsHash() const;
 };

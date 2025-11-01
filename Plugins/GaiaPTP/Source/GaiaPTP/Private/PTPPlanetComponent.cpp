@@ -12,6 +12,7 @@ UPTPPlanetComponent::UPTPPlanetComponent()
 
     // Safe initial defaults; overwritten by project settings on register if enabled
     PlanetRadiusKm = 6370.0f;
+    VisualizationScale = 100.0f;
     NumSamplePoints = 500000;
     DebugDrawStride = 50;
     NumPlates = 40;
@@ -29,6 +30,8 @@ UPTPPlanetComponent::UPTPPlanetComponent()
     SedimentAccretion = 3.0e-1f;
     SubductionUplift = 6.0e-7f;
     NumGeneratedPoints = 0;
+    NumTriangles = 0;
+    NumPlatesGenerated = 0;
 }
 
 void UPTPPlanetComponent::OnRegister()
@@ -46,6 +49,7 @@ void UPTPPlanetComponent::ApplyDefaultsFromProjectSettings()
     if (!Settings) return;
 
     PlanetRadiusKm = Settings->PlanetRadiusKm;
+    VisualizationScale = Settings->VisualizationScale;
     NumSamplePoints = Settings->NumSamplePoints;
     DebugDrawStride = Settings->DebugDrawStride;
     NumPlates = Settings->NumPlates;
@@ -64,14 +68,35 @@ void UPTPPlanetComponent::ApplyDefaultsFromProjectSettings()
     SubductionUplift = Settings->SubductionUplift;
 }
 
+uint32 UPTPPlanetComponent::ComputeSettingsHash() const
+{
+    uint32 Hash = 0;
+    Hash = HashCombine(Hash, GetTypeHash(NumSamplePoints));
+    Hash = HashCombine(Hash, GetTypeHash(NumPlates));
+    Hash = HashCombine(Hash, GetTypeHash(PlanetRadiusKm));
+    Hash = HashCombine(Hash, GetTypeHash(VisualizationScale));
+    return Hash;
+}
+
 void UPTPPlanetComponent::RebuildPlanet()
 {
+    // Skip rebuild if settings haven't changed (optimization for OnConstruction spam)
+    const uint32 CurrentHash = ComputeSettingsHash();
+    if (CurrentHash == CachedSettingsHash && SamplePoints.Num() > 0)
+    {
+        // Data already generated and settings unchanged - skip rebuild
+        return;
+    }
+
     {
         CSV_SCOPED_TIMING_STAT(GAIA_PTP, Sampling);
         SamplePoints.Reset();
         FFibonacciSphere::GeneratePoints(NumSamplePoints, PlanetRadiusKm, SamplePoints);
     }
     NumGeneratedPoints = SamplePoints.Num();
+
+    // Update cached hash
+    CachedSettingsHash = CurrentHash;
 
     // Optional: seed plates immediately using simple Voronoi on sphere
     TArray<FVector> Seeds;
@@ -100,6 +125,7 @@ void UPTPPlanetComponent::RebuildPlanet()
     // Store on component (transient preview only for Phase 1)
     Plates = MoveTemp(NewPlates);
     PointPlateIds = MoveTemp(PointToPlate);
+    NumPlatesGenerated = Plates.Num();
 }
 
 // Adjacency building will be added in a later step using the CGAL module.

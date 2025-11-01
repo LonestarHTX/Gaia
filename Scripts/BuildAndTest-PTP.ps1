@@ -22,16 +22,23 @@ Write-Host "Using UE5 at: $UE5Dir" -ForegroundColor Cyan
 Write-Host "Project: $Project" -ForegroundColor Cyan
 if ($env:VCPKG_ROOT) { Write-Host "VCPKG_ROOT: $env:VCPKG_ROOT" -ForegroundColor Cyan }
 
-# Ensure dependent CGAL DLLs are alongside the plugin module for delay-load resolution (editor runs from Engine bin)
-try {
-  $dllSource = Join-Path $env:VCPKG_ROOT 'installed/x64-windows/bin'
-  $dllTarget = Join-Path $PSScriptRoot '..\Plugins\GaiaPTP\Binaries\Win64'
-  if (Test-Path $dllSource -and (Test-Path $dllTarget)) {
-    Get-ChildItem -Path $dllSource -Filter *.dll | ForEach-Object {
-      Copy-Item -Force $_.FullName (Join-Path $dllTarget $_.Name)
+function Stage-CGAL-DLLs {
+  try {
+    if (-not $env:VCPKG_ROOT) { return }
+    $dllSource = Join-Path $env:VCPKG_ROOT 'installed/x64-windows/bin'
+    if (-not (Test-Path $dllSource)) { return }
+    $dllTarget = Join-Path $PSScriptRoot '..\Plugins\GaiaPTP\Binaries\Win64'
+    if (-not (Test-Path $dllTarget)) { New-Item -ItemType Directory -Path $dllTarget | Out-Null }
+    $needed = @('gmp-10.dll','gmpxx-4.dll','mpfr-6.dll')
+    foreach ($name in $needed) {
+      $src = Join-Path $dllSource $name
+      if (Test-Path $src) { Copy-Item -Force $src (Join-Path $dllTarget $name) }
     }
-  }
-} catch {}
+  } catch {}
+}
+
+# Stage before build (may not exist yet; directory is created if missing)
+Stage-CGAL-DLLs
 
 # Ensure vcpkg bin is on PATH for delay-loaded DLL resolution
 if ($env:VCPKG_ROOT) {
@@ -42,6 +49,9 @@ if ($env:VCPKG_ROOT) {
 $build = Join-Path $UE5Dir "Engine/Build/BatchFiles/Build.bat"
 & $build GaiaEditor Win64 Development -Project="$Project" -WaitMutex -NoHotReloadFromIDE
 if ($LASTEXITCODE -ne 0) { throw "Build failed with exit code $LASTEXITCODE" }
+
+# Stage after build (ensure DLLs present if plugin binaries just got created)
+Stage-CGAL-DLLs
 
 $editorCmd = Join-Path $UE5Dir "Engine/Binaries/Win64/UnrealEditor-Cmd.exe"
 

@@ -3,7 +3,8 @@
 UGaiaPTPSettings::UGaiaPTPSettings()
 {
     // Defaults from Implementation_Guide.md (Constants Reference)
-    PlanetRadiusKm = 6370.0f;            // R
+    PlanetRadiusKm = 6370.0f;            // R (Earth radius in km)
+    VisualizationScale = 100.0f;         // 1 km = 100 cm = 1 m in UE5 (Earth = 6.37 km radius sphere)
     TimeStepMy = 2.0f;                   // δt
 
     NumSamplePoints = 500000;            // default sphere sampling
