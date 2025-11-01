@@ -153,7 +153,8 @@ The project follows a layered architecture designed to simulate and visualize te
 
 **Layer 1: Foundation**
 - **Sphere Representation**: 500,000 points sampled via Fibonacci spiral on sphere surface
-- **Triangulation**: Spherical Delaunay triangulation (requires CGAL integration - not yet implemented)
+- **Triangulation**: Spherical Delaunay triangulation via CGAL (✅ implemented, ~4 second build time)
+- **Smart Rebuild**: Staleness detection caches triangulation - builds once in editor, PIE sessions use cached data (instant startup)
 - **Data Structures**:
   - `FCrustData` - per-point elevation, thickness, type, age, ridge/fold directions
   - `FTectonicPlate` - rotation axis, angular velocity, terrane system
@@ -236,10 +237,13 @@ Three-module architecture:
 
 **Actor/Component System:**
 - `APTPPlanetActor` - Placeable actor with default overrides
+  - **IMPORTANT**: Place in **persistent level** (not streaming levels) to avoid load/unload cycles during camera movement
+  - Auto-builds adjacency on first placement (~4s one-time operation)
+  - Subsequent editor sessions and PIE use cached data (instant)
 - `UPTPPlanetComponent` - Main component containing planet state and simulation logic
   - Points (500k FVector positions)
   - CrustData (500k FCrustData)
-  - Triangles (Delaunay mesh - pending CGAL)
+  - Triangles (Delaunay mesh via CGAL)
   - Plates (40-100 FTectonicPlate)
   - Simulation step methods
 
@@ -323,7 +327,7 @@ RealtimeMesh->UpdateSectionGroup(GroupKey, Builder.GetStreamSet());
 - Naming convention: `GaiaPTP.[Category].[TestName]`
 - Run via UnrealEditor-Cmd.exe with `-ExecCmds="Automation RunTests [filter]; Quit"`
 
-**Existing Test Coverage:**
+**Existing Test Coverage (15 tests):**
 - `GaiaPTP.Settings.Defaults` - Verify DeveloperSettings initialization
 - `GaiaPTP.Component.DefaultsCopied` - Test actor-level settings inheritance
 - `GaiaPTP.Fibonacci.CountAndRadius` - Validate point count and sphere radius
@@ -332,11 +336,18 @@ RealtimeMesh->UpdateSectionGroup(GroupKey, Builder.GetStreamSet());
 - `GaiaPTP.Data.PlateVelocity` - Verify plate rotation calculations
 - `GaiaPTP.Seeding.Basic` - Test initial Voronoi plate partitioning
 - `GaiaPTP.Adjacency.Smoke` - Basic adjacency/triangulation smoke test
+- `GaiaPTP.Adjacency.Integrity` - Verify neighbor data bidirectional consistency
+- `GaiaPTP.Determinism.Sampling` - Verify reproducible Fibonacci generation
+- `GaiaPTP.Determinism.Seeding` - Verify reproducible plate seeding
+- `GaiaPTP.CrustInit.DataInit` - Test crust data initialization
+- `GaiaPTP.CrustInit.PlateDynamics` - Test plate rotation setup
+- `GaiaPTP.CrustInit.BoundaryDetection` - Validate boundary flagging
+- `GaiaPTP.CrustInit.Integration` - End-to-end initialization test
 
 **Development Practice:**
 - Add automation tests for each new feature per implementation guide checkpoints
 - Tests verify both correctness and geological plausibility
-- Use BuildAndTest-PTP.ps1 for rapid iteration
+- Use BuildAndTest-PTP.ps1 for rapid iteration (runs all 15 tests)
 
 ### WSL2 Considerations
 
@@ -375,8 +386,9 @@ Project path uses Windows path: `/mnt/c/Users/Michael/Documents/Unreal Projects/
 - ✅ RealtimeMeshComponent integration (Points + Surface preview modes)
 - ✅ Vertex-colored plate visualization (MurmurHash3 plate colors)
 - ✅ Spore-style orbital camera (APTPOrbitCamera with mouse + keyboard controls)
-- ✅ PTPGameMode (auto-spawns camera + planet if missing)
+- ✅ PTPGameMode (sets camera as default pawn)
 - ✅ Material system (M_DevPlanet vertex color material)
+- ✅ Smart rebuild workflow (4s first build, instant PIE sessions)
 
 **Testing & Tooling:**
 - ✅ Comprehensive automation test suite (15 tests passing):
