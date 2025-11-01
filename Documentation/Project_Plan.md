@@ -3,14 +3,69 @@
 > Source reference: Documentation/Research/PTP/Implementation_Guide.md
 > Note: Per request, this plan excludes timelines/durations.
 
-## 0. Current Status
-- Completed: 1.1 Scaffold runtime/editor plugin modules; 1.2 DeveloperSettings (Appendix constants) with defaults in `Config/DefaultGame.ini`; 1.3 FibonacciSphere implementation + tests (count/radius/uniformity); 1.4 Core data structures (FCrustData, FTerrane, FTectonicPlate) + tests; 1.5 Plate seeding + Voronoi assignment + test; 1.6 CGAL-backed adjacency (wrapper lib + provider) + smoke/integrity tests.
-- Added: Planet Actor + Component with actor-local defaults and "Use Project Defaults" copy (`APTPPlanetActor`, `UPTPPlanetComponent`).
-- Verification: Build green and automation tests pass: `GaiaPTP.Settings.Defaults`, `GaiaPTP.Component.DefaultsCopied`, `GaiaPTP.Fibonacci.CountAndRadius`, `GaiaPTP.Fibonacci.UniformityBins`, `GaiaPTP.Data.Defaults`, `GaiaPTP.Data.PlateVelocity`, `GaiaPTP.Seeding.Basic`, `GaiaPTP.Adjacency.Smoke`, `GaiaPTP.Adjacency.Integrity`.
-- Quick verify:
-  - Run all: `PowerShell ./Scripts/BuildAndTest-PTP.ps1`
-  - Run targeted: `PowerShell ./Scripts/BuildAndTest-PTP.ps1 -Filters "GaiaPTP.Adjacency.Smoke","GaiaPTP.Adjacency.Integrity"`
-  - Editor: Place `APTPPlanetActor` and see editable per‑actor properties; optionally inspect Project Settings → Gaia → PTP.
+## 0. Current Status: ✅ PHASE 1 COMPLETE
+
+### Completed Systems (Phase 1 - Foundation)
+
+**Core Foundation:**
+- 1.1 Plugin structure: `GaiaPTP` (runtime), `GaiaPTPEditor` (editor), `GaiaPTPCGAL` (CGAL wrapper)
+- 1.2 DeveloperSettings: `UGaiaPTPSettings` with Appendix A constants in `Config/DefaultGame.ini`
+- 1.3 Fibonacci sphere sampling: `FFibonacciSphere` with uniformity validation
+- 1.4 Core data structures: `FCrustData`, `FTerrane`, `FTectonicPlate` with UPROPERTY markup
+- 1.5 Plate seeding: Fibonacci-based Voronoi partitioning (deterministic)
+- 1.6 CGAL Delaunay triangulation: Spherical adjacency via `Delaunay_triangulation_on_sphere_2`
+
+**Initialization Systems:**
+- **Crust initialization**: `FCrustInitialization` class with parallel per-plate setup
+  - Continental/oceanic classification (Fisher-Yates shuffle)
+  - Elevation, thickness, age initialization
+  - Ridge/fold direction setup
+- **Plate dynamics**: Random rotation axes and angular velocities
+- **Boundary detection**: Parallel neighbor checking (flags plate edges)
+
+**Visualization:**
+- **Planet Actor/Component**: `APTPPlanetActor`, `UPTPPlanetComponent` with smart rebuild
+- **RealtimeMeshComponent integration**: Points + Surface preview modes
+- **Vertex coloring**: Per-plate colors via MurmurHash3
+- **Material**: `M_DevPlanet` for vertex color rendering
+
+**Camera System:**
+- **Orbit camera**: `APTPOrbitCamera` with Spore-style controls
+  - Mouse drag to orbit (infinite rotation)
+  - Mouse wheel zoom (proportional)
+  - Keyboard WASD/arrows + Q/E
+- **Game mode**: `APTPGameMode` sets camera as default pawn
+
+**Workflow Enhancements:**
+- **Smart rebuild**: Staleness detection eliminates redundant adjacency builds
+- **PIE data persistence**: Cached triangulation duplicates to PIE (instant startup)
+- **Performance logging**: Parallel operation timing output
+- **Console commands**: Profiling, benchmarking, CVars
+
+**Testing & Automation:**
+- 15 automation tests passing (Settings, Fibonacci, Data, Seeding, Adjacency, CrustInit, Determinism)
+- 3 build scripts: `Build-PTP.ps1`, `BuildAndTest-PTP.ps1`, `Bench-PTP.ps1`
+- CGAL setup script: `Setup-CGAL.ps1`
+
+### Quick Verification
+```powershell
+# Build and run all 15 tests
+PowerShell ./Scripts/BuildAndTest-PTP.ps1
+
+# Quick build without tests
+PowerShell ./Scripts/Build-PTP.ps1
+
+# Benchmark rebuild performance
+PowerShell ./Scripts/Bench-PTP.ps1
+```
+
+**In Editor:**
+1. Place `APTPPlanetActor` in persistent level → mesh appears automatically (~4s adjacency build)
+2. PIE sessions use cached data (instant startup)
+3. Orbit camera auto-spawns with mouse/keyboard controls
+4. Configure via Project Settings → Gaia → PTP
+
+**Ready for Phase 2:** Plate movement kernel and tectonic interactions
 
 ## 1. Executive Summary
 - Goal: Implement a controllable, geologically‑plausible tectonic planet system in Unreal 5.5 that simulates plate motion and interactions to produce a coarse crust model, then amplifies it into high‑resolution terrains usable as Landscapes/meshes.
